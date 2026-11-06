@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MotionMaker.App/MotionMaker.App.csproj" />
+    <Project Path="src/MotionMaker.Core/MotionMaker.Core.csproj" />
+    <Project Path="src/MotionMaker.Geometry/MotionMaker.Geometry.csproj" />
+    <Project Path="src/MotionMaker.Viewport/MotionMaker.Viewport.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MotionMaker.Core.Tests/MotionMaker.Core.Tests.csproj" />
+    <Project Path="tests/MotionMaker.Geometry.Tests/MotionMaker.Geometry.Tests.csproj" />
+  </Folder>
+</Solution>

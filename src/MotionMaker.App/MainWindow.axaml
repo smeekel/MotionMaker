@@ -1,0 +1,121 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:viewport="using:MotionMaker.Viewport"
+        x:Class="MotionMaker.App.MainWindow"
+        Title="Motion Maker"
+        Width="1280"
+        Height="800"
+        MinWidth="960"
+        MinHeight="640"
+        KeyDown="OnKeyDown">
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_New" HotKey="Ctrl+N" Click="OnNew"/>
+        <MenuItem Header="_Open..." HotKey="Ctrl+O" Click="OnOpen"/>
+        <MenuItem Header="_Save" HotKey="Ctrl+S" Click="OnSave"/>
+        <MenuItem Header="Save _As..." HotKey="Ctrl+Shift+S" Click="OnSaveAs"/>
+        <Separator/>
+        <MenuItem Header="_Recent" x:Name="RecentMenu"/>
+        <Separator/>
+        <MenuItem Header="E_xit" Click="OnExit"/>
+      </MenuItem>
+      <MenuItem Header="_Edit">
+        <MenuItem x:Name="UndoMenu" Header="_Undo" HotKey="Ctrl+Z" Click="OnUndo"/>
+        <MenuItem x:Name="RedoMenu" Header="_Redo" HotKey="Ctrl+Y" Click="OnRedo"/>
+        <Separator/>
+        <MenuItem Header="_Preferences..." Click="OnPreferences"/>
+      </MenuItem>
+      <MenuItem Header="_Project">
+        <MenuItem Header="Add _Assembly" Click="OnAddAssembly"/>
+        <MenuItem Header="Add _Part" Click="OnAddPart"/>
+        <MenuItem Header="_Rename..." Click="OnRename"/>
+        <MenuItem Header="_Delete" Click="OnDelete"/>
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="_Top" Click="OnTop"/>
+        <MenuItem Header="_Front" Click="OnFront"/>
+        <MenuItem Header="_Right" Click="OnRight"/>
+        <MenuItem Header="_Iso" Click="OnIso"/>
+        <Separator/>
+        <MenuItem x:Name="PerspectiveMenu" Header="_Perspective" ToggleType="CheckBox" Click="OnPerspective"/>
+        <MenuItem Header="Zoom to _plate" HotKey="B" Click="OnFrame"/>
+        <MenuItem x:Name="GridMenu" Header="_Grid" ToggleType="CheckBox" IsChecked="True" Click="OnGrid"/>
+        <MenuItem x:Name="SnapMenu" Header="_Snap" ToggleType="CheckBox" IsChecked="True" Click="OnSnap"/>
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_About" Click="OnAbout"/>
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Top" Background="#2B2D31" Padding="6,4">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Button Content="New" Click="OnNew"/>
+        <Button Content="Open" Click="OnOpen"/>
+        <Button Content="Save" Click="OnSave"/>
+        <Button Content="Assembly" Click="OnAddAssembly"/>
+        <Button Content="Part" Click="OnAddPart"/>
+        <Separator Width="1" Height="22" Margin="4,0"/>
+        <Button Content="Top" Click="OnTop"/>
+        <Button Content="Front" Click="OnFront"/>
+        <Button Content="Right" Click="OnRight"/>
+        <Button Content="Iso" Click="OnIso"/>
+        <Button Content="Fit" Click="OnFrame"/>
+        <Separator Width="1" Height="22" Margin="4,0"/>
+        <StackPanel x:Name="SketchTools" Orientation="Horizontal" Spacing="6" IsVisible="False">
+          <Button x:Name="SelectTool" Content="Select" Click="OnSelectTool"/>
+          <Button x:Name="LineTool" Content="Line" Click="OnLineTool"/>
+          <Button x:Name="RectangleTool" Content="Rectangle" Click="OnRectangleTool"/>
+          <Button x:Name="CircleTool" Content="Circle" Click="OnCircleTool"/>
+          <Separator Width="1" Height="22" Margin="4,0"/>
+          <Button Content="H" Click="OnHorizontal" ToolTip.Tip="Horizontal"/>
+          <Button Content="V" Click="OnVertical" ToolTip.Tip="Vertical"/>
+          <Button Content="Coincident" Click="OnCoincident"/>
+          <Button Content="Length" Click="OnLength"/>
+          <Button Content="Radius" Click="OnRadius"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Background="#1E2024" Padding="10,4">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock x:Name="CursorStatus" VerticalAlignment="Center"/>
+        <TextBlock x:Name="ActiveStatus" Grid.Column="1" Margin="16,0" VerticalAlignment="Center"/>
+        <TextBlock x:Name="MessageStatus" Grid.Column="2" VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <Border DockPanel.Dock="Left" Width="280" Background="#24262A" BorderBrush="#3A3D42" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="Project" Margin="12,10,12,6" FontWeight="SemiBold"/>
+        <TreeView x:Name="Explorer" SelectionChanged="OnExplorerSelectionChanged"/>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Right" Width="250" Background="#24262A" BorderBrush="#3A3D42" BorderThickness="1,0,0,0" Padding="12">
+      <ScrollViewer>
+        <StackPanel Spacing="8">
+          <TextBlock Text="Properties" FontWeight="SemiBold"/>
+          <StackPanel x:Name="PlateProperties" Spacing="6" IsVisible="False">
+            <TextBlock Text="Width (mm)"/>
+            <NumericUpDown x:Name="PlateWidth" Minimum="10" Maximum="5000" Increment="10" FormatString="0.##" ValueChanged="OnPlateEdited"/>
+            <TextBlock Text="Depth (mm)"/>
+            <NumericUpDown x:Name="PlateDepth" Minimum="10" Maximum="5000" Increment="10" FormatString="0.##" ValueChanged="OnPlateEdited"/>
+          </StackPanel>
+          <TextBlock x:Name="PropertyNote" TextWrapping="Wrap"/>
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <Grid Background="#26282E">
+      <viewport:SceneView x:Name="Scene"/>
+      <Canvas x:Name="MarkerLayer" IsHitTestVisible="False"/>
+      <TextBlock x:Name="GlStatus" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Top"
+                Margin="0,12,0,0" Foreground="#F0C674" TextWrapping="Wrap" MaxWidth="640"/>
+      <Border x:Name="EmptyPrompt" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Background="#CC1E2024" Padding="18,12" CornerRadius="6">
+        <TextBlock Text="Add an assembly or a part" FontSize="16"/>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>
