@@ -8,7 +8,7 @@ public class CameraMathTests
     public void DraggingRightTurnsTheSceneToTheRight()
     {
         var camera = CameraState.CreateAssemblyView(new PlateSettings());
-        var world = new Vec3(camera.TargetX + 40, camera.TargetY, camera.TargetZ);
+        var world = new Vec3(0, 0, 0);
         Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var before));
 
         CameraMath.Orbit(camera, 30, 0, 1);
@@ -28,6 +28,19 @@ public class CameraMathTests
 
         Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var after));
         Assert.True(after.NdcX > before.NdcX);
+    }
+
+    [Fact]
+    public void DraggingDownPansTheSceneDown()
+    {
+        var camera = CameraState.CreateAssemblyView(new PlateSettings());
+        var world = new Vec3(camera.TargetX, camera.TargetY, camera.TargetZ);
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var before));
+
+        CameraMath.Pan(camera, 0, 40, 600, 1);
+
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var after));
+        Assert.True(after.NdcY < before.NdcY);
     }
 
     [Fact]

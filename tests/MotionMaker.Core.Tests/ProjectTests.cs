@@ -36,7 +36,7 @@ public class ProjectTests
         Assert.Equal(300, restored.Assemblies[1].Plate.WidthMm);
         Assert.Equal(part.Id, restored.Assemblies[0].Placements[0].PartId);
         Assert.Equal(15, restored.Assemblies[0].Placements[0].RotationDegrees);
-        Assert.Equal(45, restored.Assemblies[0].Camera.YawDegrees);
+        Assert.Equal(225, restored.Assemblies[0].Camera.YawDegrees);
         var restoredSketch = restored.Parts.Single().Sketches.Single();
         Assert.Equal(ConstraintKind.Horizontal, restoredSketch.Constraints.Single().Kind);
         Assert.Equal(4, restoredSketch.Points[1].X);

@@ -42,7 +42,7 @@ public sealed class CameraState
 
     public double Distance { get; set; } = 400;
 
-    public double YawDegrees { get; set; } = 45;
+    public double YawDegrees { get; set; } = 225;
 
     public double PitchDegrees { get; set; } = 35;
 
@@ -66,7 +66,7 @@ public sealed class CameraState
     {
         var camera = new CameraState
         {
-            YawDegrees = 45,
+            YawDegrees = 225,
             PitchDegrees = 35,
             Perspective = true
         };
@@ -151,9 +151,9 @@ public static class CameraMath
     {
         var basis = Basis(camera);
         var scale = (2 * VisibleHalfHeight(camera) / Math.Max(viewportHeightPixels, 1)) * sensitivity;
-        camera.TargetX += -basis.Right.X * deltaXPixels * scale - basis.Up.X * deltaYPixels * scale;
-        camera.TargetY += -basis.Right.Y * deltaXPixels * scale - basis.Up.Y * deltaYPixels * scale;
-        camera.TargetZ += -basis.Right.Z * deltaXPixels * scale - basis.Up.Z * deltaYPixels * scale;
+        camera.TargetX += -basis.Right.X * deltaXPixels * scale + basis.Up.X * deltaYPixels * scale;
+        camera.TargetY += -basis.Right.Y * deltaXPixels * scale + basis.Up.Y * deltaYPixels * scale;
+        camera.TargetZ += -basis.Right.Z * deltaXPixels * scale + basis.Up.Z * deltaYPixels * scale;
     }
 
     public static void Zoom(CameraState camera, double wheelNotches, bool invert, double sensitivity)
@@ -180,7 +180,7 @@ public static class CameraMath
                 camera.PitchDegrees = 0;
                 break;
             case ViewPreset.Iso:
-                camera.YawDegrees = 45;
+                camera.YawDegrees = 225;
                 camera.PitchDegrees = 35;
                 camera.Perspective = true;
                 break;
