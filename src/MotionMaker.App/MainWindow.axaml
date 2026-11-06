@@ -107,8 +107,13 @@
       </ScrollViewer>
     </Border>
 
-    <Grid Background="#26282E">
-      <viewport:SceneView x:Name="Scene"/>
+    <Grid x:Name="ViewportHost" Background="#26282E"
+          PointerPressed="OnViewportPressed"
+          PointerMoved="OnViewportMoved"
+          PointerReleased="OnViewportReleased"
+          PointerCaptureLost="OnViewportCaptureLost"
+          PointerWheelChanged="OnViewportWheel">
+      <viewport:SceneView x:Name="Scene" IsHitTestVisible="False"/>
       <Canvas x:Name="MarkerLayer" IsHitTestVisible="False"/>
       <TextBlock x:Name="GlStatus" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Top"
                 Margin="0,12,0,0" Foreground="#F0C674" TextWrapping="Wrap" MaxWidth="640"/>

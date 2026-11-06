@@ -30,7 +30,8 @@ public sealed class Session
     public Session(UserSettings settings)
     {
         Settings = settings;
-        History = new EditHistory(new ProjectDocument());
+        History = new EditHistory(ProjectEdits.CreateNew());
+        SelectFirst();
     }
 
     public EditHistory History { get; private set; }
@@ -73,15 +74,20 @@ public sealed class Session
 
     public void NewProject()
     {
-        History.Reset(new ProjectDocument());
+        History.Reset(ProjectEdits.CreateNew());
         FilePath = null;
-        ClearSelection();
+        SelectFirst();
         NotifyModel();
     }
 
     public void LoadFile(string path)
     {
         var document = ProjectSerializer.FromJson(File.ReadAllText(path));
+        if (document.Assemblies.Count == 0)
+        {
+            ProjectEdits.AddAssembly(document);
+        }
+
         History.Reset(document);
         FilePath = path;
         Settings.RememberFile(path);
@@ -133,9 +139,14 @@ public sealed class Session
         switch (SelectedKind)
         {
             case ProjectNodeKind.Assembly:
-                ProjectEdits.RemoveAssembly(Document, OwnerId);
+                if (!ProjectEdits.RemoveAssembly(Document, OwnerId))
+                {
+                    error = "A project must keep at least one assembly.";
+                    return false;
+                }
+
                 History.Commit(before);
-                ClearSelection();
+                SelectFirst();
                 NotifyModel();
                 return true;
             case ProjectNodeKind.Part:
@@ -146,7 +157,7 @@ public sealed class Session
                 }
 
                 History.Commit(before);
-                ClearSelection();
+                SelectFirst();
                 NotifyModel();
                 return true;
             case ProjectNodeKind.Line:

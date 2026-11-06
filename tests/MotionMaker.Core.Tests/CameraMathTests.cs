@@ -5,6 +5,32 @@ namespace MotionMaker.Core.Tests;
 public class CameraMathTests
 {
     [Fact]
+    public void DraggingRightTurnsTheSceneToTheRight()
+    {
+        var camera = CameraState.CreateAssemblyView(new PlateSettings());
+        var world = new Vec3(camera.TargetX + 40, camera.TargetY, camera.TargetZ);
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var before));
+
+        CameraMath.Orbit(camera, 30, 0, 1);
+
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var after));
+        Assert.True(after.NdcX > before.NdcX);
+    }
+
+    [Fact]
+    public void DraggingRightPansTheSceneToTheRight()
+    {
+        var camera = CameraState.CreateAssemblyView(new PlateSettings());
+        var world = new Vec3(camera.TargetX, camera.TargetY, camera.TargetZ);
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var before));
+
+        CameraMath.Pan(camera, 40, 0, 600, 1);
+
+        Assert.True(CameraMath.TryProject(camera, 800, 600, world, out var after));
+        Assert.True(after.NdcX > before.NdcX);
+    }
+
+    [Fact]
     public void OrbitKeepsTargetAndDistance()
     {
         var camera = Sample();

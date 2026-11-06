@@ -12,17 +12,17 @@ internal enum SaveChoice
 
 internal static class Dialogs
 {
-    public static async Task<SaveChoice> AskSaveAsync(Window owner)
+    public static async Task<SaveChoice> AskSaveAsync(Window owner, string? message = null)
     {
         var choice = SaveChoice.Cancel;
-        var dialog = Create("Save changes", 420, 170);
+        var dialog = Create("Save changes", 460, 180);
         var save = new Button { Content = "Save", IsDefault = true, MinWidth = 88 };
         var discard = new Button { Content = "Don't save", MinWidth = 88 };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 88 };
         save.Click += (_, _) => { choice = SaveChoice.Save; dialog.Close(); };
         discard.Click += (_, _) => { choice = SaveChoice.Discard; dialog.Close(); };
         cancel.Click += (_, _) => { choice = SaveChoice.Cancel; dialog.Close(); };
-        dialog.Content = Layout("Save changes to this project?", save, discard, cancel);
+        dialog.Content = Layout(message ?? "Save changes to this project?", save, discard, cancel);
         await dialog.ShowDialog(owner);
         return choice;
     }

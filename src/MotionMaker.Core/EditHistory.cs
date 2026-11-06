@@ -19,7 +19,7 @@ public sealed class EditHistory
 
     public bool CanRedo => _redo.Count > 0;
 
-    public bool IsDirty => _dirty;
+    public bool IsDirty => _dirty || Capture() != _savedJson;
 
     public string Capture() => ProjectSerializer.ToJson(Document);
 

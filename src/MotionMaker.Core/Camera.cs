@@ -134,9 +134,10 @@ public static class CameraMath
 
     public static void Orbit(CameraState camera, double deltaXPixels, double deltaYPixels, double sensitivity)
     {
+        // Screen X grows to the right. Decreasing yaw turns the plate with that drag.
         camera.YawDegrees -= deltaXPixels * 0.4 * sensitivity;
         camera.PitchDegrees = Math.Clamp(
-            camera.PitchDegrees - deltaYPixels * 0.4 * sensitivity,
+            camera.PitchDegrees + deltaYPixels * 0.4 * sensitivity,
             MinPitchDegrees,
             MaxPitchDegrees);
     }
@@ -150,9 +151,9 @@ public static class CameraMath
     {
         var basis = Basis(camera);
         var scale = (2 * VisibleHalfHeight(camera) / Math.Max(viewportHeightPixels, 1)) * sensitivity;
-        camera.TargetX += basis.Right.X * deltaXPixels * scale - basis.Up.X * deltaYPixels * scale;
-        camera.TargetY += basis.Right.Y * deltaXPixels * scale - basis.Up.Y * deltaYPixels * scale;
-        camera.TargetZ += basis.Right.Z * deltaXPixels * scale - basis.Up.Z * deltaYPixels * scale;
+        camera.TargetX += -basis.Right.X * deltaXPixels * scale - basis.Up.X * deltaYPixels * scale;
+        camera.TargetY += -basis.Right.Y * deltaXPixels * scale - basis.Up.Y * deltaYPixels * scale;
+        camera.TargetZ += -basis.Right.Z * deltaXPixels * scale - basis.Up.Z * deltaYPixels * scale;
     }
 
     public static void Zoom(CameraState camera, double wheelNotches, bool invert, double sensitivity)

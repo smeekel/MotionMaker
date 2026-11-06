@@ -115,16 +115,14 @@ public sealed class SceneView : OpenGlControlBase
         }
     }
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    public void BeginPointer(PointerPressedEventArgs e, Point point)
     {
         Focus();
-        var point = e.GetPosition(this);
         var properties = e.GetCurrentPoint(this).Properties;
         if (properties.IsRightButtonPressed || properties.IsMiddleButtonPressed)
         {
             _panning = true;
             _last = point;
-            e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
@@ -139,7 +137,6 @@ public sealed class SceneView : OpenGlControlBase
         {
             _orbiting = true;
             _last = point;
-            e.Pointer.Capture(this);
             e.Handled = true;
             return;
         }
@@ -148,13 +145,11 @@ public sealed class SceneView : OpenGlControlBase
         _last = point;
         UpdateCursor(point);
         RaiseSketch(SketchPointerPhase.Pressed);
-        e.Pointer.Capture(this);
         e.Handled = true;
     }
 
-    protected override void OnPointerMoved(PointerEventArgs e)
+    public void MovePointer(PointerEventArgs e, Point point)
     {
-        var point = e.GetPosition(this);
         if (Scene?.Camera is CameraState camera && (_orbiting || _panning))
         {
             var dx = point.X - _last.X;
@@ -166,7 +161,7 @@ public sealed class SceneView : OpenGlControlBase
             }
             else
             {
-                CameraMath.Pan(camera, dx, dy, Bounds.Height, PanSensitivity);
+                CameraMath.Pan(camera, dx, dy, Math.Max(Bounds.Height, 1), PanSensitivity);
             }
 
             InvalidateView();
@@ -186,21 +181,19 @@ public sealed class SceneView : OpenGlControlBase
         e.Handled = _orbiting || _panning || _sketching;
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    public void EndPointer(Point? point)
     {
+        var wasActive = _orbiting || _panning || _sketching;
         EndCameraDrag();
-        UpdateCursor(e.GetPosition(this));
+        UpdateCursor(point ?? _last);
         FinishSketch();
-        e.Pointer.Capture(null);
+        if (wasActive)
+        {
+            InvalidateView();
+        }
     }
 
-    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
-    {
-        EndCameraDrag();
-        FinishSketch();
-    }
-
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    public void WheelPointer(PointerWheelEventArgs e, Point point)
     {
         if (Scene?.Camera is not CameraState camera)
         {
@@ -210,7 +203,7 @@ public sealed class SceneView : OpenGlControlBase
         CameraMath.Zoom(camera, e.Delta.Y, InvertWheel, 1);
         InvalidateView();
         ViewChanged?.Invoke();
-        UpdateCursor(e.GetPosition(this));
+        UpdateCursor(point);
         e.Handled = true;
     }
 

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using MotionMaker.Core;
 using MotionMaker.Viewport;
 
@@ -13,6 +14,7 @@ public partial class MainWindow : Window
     private bool _updatingTree;
     private bool _syncingProperties;
     private bool _acceptClose;
+    private bool _confirmingClose;
     private string _cursor = "—";
 
     public MainWindow()
@@ -29,6 +31,7 @@ public partial class MainWindow : Window
         Scene.CursorMoved += OnCursorMoved;
         Scene.SketchGesture += pointer => _session.OnSketchPointer(pointer);
         Scene.GlStateChanged += UpdateGlStatus;
+        ViewportHost.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Arrow);
         RebuildRecentMenu();
         RefreshAll();
     }
@@ -228,6 +231,30 @@ public partial class MainWindow : Window
         _session.Select(node);
     }
 
+    private void OnViewportPressed(object? sender, PointerPressedEventArgs e)
+    {
+        Scene.BeginPointer(e, e.GetPosition(Scene));
+        if (e.Handled)
+        {
+            e.Pointer.Capture(ViewportHost);
+        }
+    }
+
+    private void OnViewportMoved(object? sender, PointerEventArgs e)
+        => Scene.MovePointer(e, e.GetPosition(Scene));
+
+    private void OnViewportReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        Scene.EndPointer(e.GetPosition(Scene));
+        e.Pointer.Capture(null);
+    }
+
+    private void OnViewportCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+        => Scene.EndPointer(null);
+
+    private void OnViewportWheel(object? sender, PointerWheelEventArgs e)
+        => Scene.WheelPointer(e, e.GetPosition(Scene));
+
     private void OnCursorMoved(double x, double y, bool hit)
     {
         _cursor = hit ? $"X {x:0.00}    Y {y:0.00}    Z 0.00 mm" : "—";
@@ -268,38 +295,61 @@ public partial class MainWindow : Window
         }
     }
 
-    protected override async void OnClosing(WindowClosingEventArgs e)
+    protected override void OnClosing(WindowClosingEventArgs e)
     {
         if (_acceptClose)
         {
-            _session.Settings.WindowWidth = Width;
-            _session.Settings.WindowHeight = Height;
-            SettingsStore.Save(_session.Settings);
+            RememberWindowSize();
             return;
         }
 
         if (!_session.History.IsDirty)
         {
-            _session.Settings.WindowWidth = Width;
-            _session.Settings.WindowHeight = Height;
-            SettingsStore.Save(_session.Settings);
+            RememberWindowSize();
             return;
         }
 
         e.Cancel = true;
-        var choice = await Dialogs.AskSaveAsync(this);
-        if (choice == SaveChoice.Cancel)
+        if (_confirmingClose)
         {
             return;
         }
 
-        if (choice == SaveChoice.Save && !await SaveAsync(saveAs: false))
-        {
-            return;
-        }
+        _confirmingClose = true;
+        Dispatcher.UIThread.Post(ConfirmCloseAsync);
+    }
 
-        _acceptClose = true;
-        Close();
+    private async void ConfirmCloseAsync()
+    {
+        try
+        {
+            var choice = await Dialogs.AskSaveAsync(
+                this,
+                "This project has unsaved changes. Save them before closing?");
+            if (choice == SaveChoice.Cancel)
+            {
+                return;
+            }
+
+            if (choice == SaveChoice.Save && !await SaveAsync(saveAs: false))
+            {
+                return;
+            }
+
+            _acceptClose = true;
+            Close();
+        }
+        finally
+        {
+            _confirmingClose = false;
+        }
+    }
+
+    private void RememberWindowSize()
+    {
+        _session.Settings.WindowWidth = Width;
+        _session.Settings.WindowHeight = Height;
+        SettingsStore.Save(_session.Settings);
     }
 
     private void RefreshAll()
@@ -314,6 +364,7 @@ public partial class MainWindow : Window
 
     private void RefreshView()
     {
+        Title = $"Motion Maker — {_session.DisplayName}{(_session.History.IsDirty ? "*" : "")}";
         SketchTools.IsVisible = _session.SelectedPart is not null;
         SelectTool.FontWeight = _session.Tool == SketchTool.Select ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal;
         LineTool.FontWeight = _session.Tool == SketchTool.Line ? Avalonia.Media.FontWeight.Bold : Avalonia.Media.FontWeight.Normal;

@@ -121,9 +121,22 @@ public class ProjectTests
 
         Assert.False(removed);
         Assert.Equal(assembly.Name, usedBy);
+        var spare = ProjectEdits.AddAssembly(project);
         Assert.True(ProjectEdits.RemoveAssembly(project, assembly.Id));
         Assert.Single(project.Parts);
-        Assert.Empty(project.Assemblies);
+        Assert.Equal(spare.Id, project.Assemblies.Single().Id);
+        Assert.False(ProjectEdits.RemoveAssembly(project, spare.Id));
+        Assert.Single(project.Assemblies);
+    }
+
+    [Fact]
+    public void NewProjectStartsWithOneAssembly()
+    {
+        var project = ProjectEdits.CreateNew();
+
+        Assert.Single(project.Assemblies);
+        Assert.Equal(250, project.Assemblies[0].Plate.WidthMm);
+        Assert.False(ProjectEdits.RemoveAssembly(project, project.Assemblies[0].Id));
     }
 
     [Fact]
@@ -143,9 +156,20 @@ public class ProjectTests
         Assert.Equal(210, history.Document.Assemblies.Single().Plate.DepthMm);
         history.Redo();
         Assert.Equal(100, history.Document.Assemblies.Single().Plate.WidthMm);
-        Assert.False(history.IsDirty == false);
+        Assert.True(history.IsDirty);
         history.MarkSaved();
         Assert.False(history.IsDirty);
+    }
+
+    [Fact]
+    public void CameraMovementCountsAsUnsaved()
+    {
+        var history = new EditHistory(ProjectEdits.CreateNew());
+        Assert.False(history.IsDirty);
+
+        history.Document.Assemblies[0].Camera.YawDegrees += 15;
+
+        Assert.True(history.IsDirty);
     }
 
     [Fact]

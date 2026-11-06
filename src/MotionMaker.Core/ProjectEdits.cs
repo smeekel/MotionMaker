@@ -43,6 +43,13 @@ public sealed record BomLine(Guid PartId, string PartName, int Quantity);
 
 public static class ProjectEdits
 {
+    public static ProjectDocument CreateNew()
+    {
+        var document = new ProjectDocument();
+        AddAssembly(document);
+        return document;
+    }
+
     public static AssemblyDesign AddAssembly(ProjectDocument document)
     {
         var assembly = new AssemblyDesign
@@ -79,6 +86,11 @@ public static class ProjectEdits
 
     public static bool RemoveAssembly(ProjectDocument document, Guid assemblyId)
     {
+        if (document.Assemblies.Count <= 1)
+        {
+            return false;
+        }
+
         var assembly = document.Assemblies.FirstOrDefault(item => item.Id == assemblyId);
         if (assembly is null)
         {
