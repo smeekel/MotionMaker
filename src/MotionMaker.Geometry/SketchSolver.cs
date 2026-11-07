@@ -6,20 +6,35 @@ public static class SketchSolver
 {
     public const double Tolerance = 1e-4;
 
+    public readonly record struct PinnedPoint(Guid Id, double X, double Y);
+
     public static SolveResult Solve(
         Sketch sketch,
         Guid? fixedPointId = null,
         double? fixedX = null,
         double? fixedY = null)
     {
-        var work = sketch.Clone();
         if (fixedPointId is Guid fixedId && fixedX is double x && fixedY is double y)
         {
-            var point = work.Points.FirstOrDefault(item => item.Id == fixedId);
-            if (point is not null)
+            return SolvePinned(sketch, [new PinnedPoint(fixedId, x, y)]);
+        }
+
+        return SolvePinned(sketch, null);
+    }
+
+    public static SolveResult SolvePinned(Sketch sketch, IReadOnlyList<PinnedPoint>? pinned)
+    {
+        var work = sketch.Clone();
+        if (pinned is not null)
+        {
+            foreach (var pin in pinned)
             {
-                point.X = x;
-                point.Y = y;
+                var point = work.Points.FirstOrDefault(item => item.Id == pin.Id);
+                if (point is not null)
+                {
+                    point.X = pin.X;
+                    point.Y = pin.Y;
+                }
             }
         }
 
@@ -29,7 +44,7 @@ public static class SketchSolver
             return SolveResult.Ok();
         }
 
-        var variables = CollectVariables(work, fixedPointId);
+        var variables = CollectVariables(work, pinned);
         if (!TryConverge(work, variables))
         {
             return SolveResult.Failed("Constraints could not be solved.");
@@ -220,12 +235,13 @@ public static class SketchSolver
         residuals.Add(vertical ? end.X - start.X : end.Y - start.Y);
     }
 
-    private static List<Variable> CollectVariables(Sketch sketch, Guid? fixedPointId)
+    private static List<Variable> CollectVariables(Sketch sketch, IReadOnlyList<PinnedPoint>? pinned)
     {
+        var fixedIds = pinned?.Select(pin => pin.Id).ToHashSet() ?? [];
         var variables = new List<Variable>();
         foreach (var point in sketch.Points)
         {
-            if (point.Id == fixedPointId)
+            if (point.SlotId is not null || fixedIds.Contains(point.Id))
             {
                 continue;
             }

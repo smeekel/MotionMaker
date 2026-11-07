@@ -301,6 +301,87 @@ public static class CameraMath
         return true;
     }
 
+    public static bool TryRay(
+        CameraState camera,
+        double viewportWidth,
+        double viewportHeight,
+        double pixelX,
+        double pixelY,
+        out Vec3 origin,
+        out Vec3 direction)
+    {
+        var ndcX = (pixelX / Math.Max(viewportWidth, 1)) * 2 - 1;
+        var ndcY = 1 - (pixelY / Math.Max(viewportHeight, 1)) * 2;
+        var basis = Basis(camera);
+        var tanHalf = Math.Tan(camera.FieldOfViewDegrees * Math.PI / 360.0);
+        var aspect = Math.Max(viewportWidth, 1) / Math.Max(viewportHeight, 1);
+        if (camera.Perspective)
+        {
+            origin = basis.Eye;
+            direction = (basis.Forward
+                + basis.Right * (ndcX * tanHalf * aspect)
+                + basis.Up * (ndcY * tanHalf)).Normalized();
+        }
+        else
+        {
+            var halfHeight = VisibleHalfHeight(camera);
+            origin = basis.Eye
+                + basis.Right * (ndcX * halfHeight * aspect)
+                + basis.Up * (ndcY * halfHeight);
+            direction = basis.Forward;
+        }
+
+        return direction.Length > 1e-9;
+    }
+
+    public static bool TryHitSketchPlane(
+        CameraState camera,
+        double viewportWidth,
+        double viewportHeight,
+        double pixelX,
+        double pixelY,
+        SketchPlane plane,
+        out double u,
+        out double v,
+        out Vec3 world)
+    {
+        u = 0;
+        v = 0;
+        world = default;
+        if (!TryRay(camera, viewportWidth, viewportHeight, pixelX, pixelY, out var origin, out var direction))
+        {
+            return false;
+        }
+
+        var normal = plane.Normal;
+        var denominator = Vec3.Dot(direction, normal);
+        if (Math.Abs(denominator) < 1e-9)
+        {
+            return false;
+        }
+
+        var t = Vec3.Dot(plane.Origin - origin, normal) / denominator;
+        if (camera.Perspective && t < 0)
+        {
+            return false;
+        }
+
+        world = origin + direction * t;
+        plane.ToLocal(world, out u, out v);
+        return true;
+    }
+
+    public static void LookAtPlane(CameraState camera, SketchPlane plane)
+    {
+        var normal = plane.Normal.Normalized();
+        camera.TargetX = plane.OriginX;
+        camera.TargetY = plane.OriginY;
+        camera.TargetZ = plane.OriginZ;
+        camera.PitchDegrees = Math.Clamp(Math.Asin(Math.Clamp(normal.Z, -1, 1)) * 180 / Math.PI, MinPitchDegrees, MaxPitchDegrees);
+        camera.YawDegrees = Math.Atan2(normal.Y, normal.X) * 180 / Math.PI;
+        camera.Perspective = false;
+    }
+
     private static IEnumerable<Vec3> Corners(
         double minX, double minY, double minZ, double maxX, double maxY, double maxZ)
     {

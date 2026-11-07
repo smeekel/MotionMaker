@@ -13,6 +13,10 @@ public enum ProjectNodeKind
     Line,
     Circle,
     Constraint,
+    Slot,
+    Pad,
+    Hole,
+    Gear,
     Body
 }
 
@@ -25,6 +29,10 @@ public sealed class ProjectNode
     public Guid OwnerId { get; init; }
 
     public Guid ItemId { get; init; }
+
+    public string Icon { get; init; } = "";
+
+    public bool Frozen { get; init; }
 
     public List<ProjectNode> Children { get; init; } = [];
 }
@@ -54,7 +62,8 @@ public static class ProjectTreeBuilder
             Title = "Placements",
             Kind = ProjectNodeKind.Placements,
             OwnerId = assembly.Id,
-            ItemId = assembly.Id
+            ItemId = assembly.Id,
+            Icon = "placements"
         };
         foreach (var placement in assembly.Placements)
         {
@@ -64,7 +73,8 @@ public static class ProjectTreeBuilder
                 Title = partName,
                 Kind = ProjectNodeKind.Placement,
                 OwnerId = assembly.Id,
-                ItemId = placement.Id
+                ItemId = placement.Id,
+                Icon = "part"
             });
         }
 
@@ -73,7 +83,8 @@ public static class ProjectTreeBuilder
             Title = "Bill of materials",
             Kind = ProjectNodeKind.Bom,
             OwnerId = assembly.Id,
-            ItemId = assembly.Id
+            ItemId = assembly.Id,
+            Icon = "bom"
         };
         foreach (var line in BillOfMaterials.For(project, assembly))
         {
@@ -82,7 +93,8 @@ public static class ProjectTreeBuilder
                 Title = $"{line.PartName} × {line.Quantity}",
                 Kind = ProjectNodeKind.BomLine,
                 OwnerId = assembly.Id,
-                ItemId = line.PartId
+                ItemId = line.PartId,
+                Icon = "bom"
             });
         }
 
@@ -92,6 +104,7 @@ public static class ProjectTreeBuilder
             Kind = ProjectNodeKind.Assembly,
             OwnerId = assembly.Id,
             ItemId = assembly.Id,
+            Icon = "assembly",
             Children =
             [
                 new ProjectNode
@@ -99,7 +112,8 @@ public static class ProjectTreeBuilder
                     Title = $"Plate {assembly.Plate.WidthMm:0.##} × {assembly.Plate.DepthMm:0.##} mm",
                     Kind = ProjectNodeKind.Plate,
                     OwnerId = assembly.Id,
-                    ItemId = assembly.Id
+                    ItemId = assembly.Id,
+                    Icon = "plate"
                 },
                 placements,
                 bom
@@ -109,53 +123,32 @@ public static class ProjectTreeBuilder
 
     private static ProjectNode BuildPart(PartDesign part)
     {
-        var sketch = part.Sketches.FirstOrDefault();
-        var sketchNode = new ProjectNode
+        var children = new List<ProjectNode>();
+        var consumed = new HashSet<Guid>();
+        foreach (var feature in part.Features.Where(feature => feature.Parents.Count == 0))
         {
-            Title = sketch?.Name ?? "Sketch",
-            Kind = ProjectNodeKind.Sketch,
-            OwnerId = part.Id,
-            ItemId = sketch?.Id ?? part.Id
-        };
-        if (sketch is not null)
-        {
-            var lineIndex = 1;
-            foreach (var line in sketch.Lines)
+            if (consumed.Add(feature.Id))
             {
-                sketchNode.Children.Add(new ProjectNode
-                {
-                    Title = $"Line {lineIndex}",
-                    Kind = ProjectNodeKind.Line,
-                    OwnerId = part.Id,
-                    ItemId = line.Id
-                });
-                lineIndex++;
-            }
-
-            var circleIndex = 1;
-            foreach (var circle in sketch.Circles)
-            {
-                sketchNode.Children.Add(new ProjectNode
-                {
-                    Title = $"Circle {circleIndex}",
-                    Kind = ProjectNodeKind.Circle,
-                    OwnerId = part.Id,
-                    ItemId = circle.Id
-                });
-                circleIndex++;
-            }
-
-            foreach (var constraint in sketch.Constraints)
-            {
-                sketchNode.Children.Add(new ProjectNode
-                {
-                    Title = Describe(constraint),
-                    Kind = ProjectNodeKind.Constraint,
-                    OwnerId = part.Id,
-                    ItemId = constraint.Id
-                });
+                children.Add(BuildFeature(part, feature, consumed));
             }
         }
+
+        foreach (var feature in part.Features)
+        {
+            if (consumed.Add(feature.Id))
+            {
+                children.Add(BuildFeature(part, feature, consumed));
+            }
+        }
+
+        children.Add(new ProjectNode
+        {
+            Title = part.Body.HasSolid ? "Body" : "Body (empty)",
+            Kind = ProjectNodeKind.Body,
+            OwnerId = part.Id,
+            ItemId = part.Id,
+            Icon = "body"
+        });
 
         return new ProjectNode
         {
@@ -163,19 +156,114 @@ public static class ProjectTreeBuilder
             Kind = ProjectNodeKind.Part,
             OwnerId = part.Id,
             ItemId = part.Id,
-            Children =
-            [
-                sketchNode,
-                new ProjectNode
-                {
-                    Title = part.Body.HasSolid ? "Body" : "Body (empty)",
-                    Kind = ProjectNodeKind.Body,
-                    OwnerId = part.Id,
-                    ItemId = part.Id
-                }
-            ]
+            Icon = "part",
+            Children = children
         };
     }
+
+    private static ProjectNode BuildFeature(PartDesign part, PartFeature feature, HashSet<Guid> consumed)
+    {
+        var node = new ProjectNode
+        {
+            Title = feature.Name,
+            Kind = KindOf(feature.Kind),
+            OwnerId = part.Id,
+            ItemId = feature.Id,
+            Icon = IconOf(feature.Kind),
+            Frozen = feature.State == FeatureState.Frozen
+        };
+        if (feature.Kind == FeatureKind.Sketch && feature.SketchId is Guid sketchId)
+        {
+            var sketch = part.Sketches.FirstOrDefault(item => item.Id == sketchId);
+            if (sketch is not null)
+            {
+                AddSketchEntities(node, part.Id, sketch);
+            }
+        }
+
+        foreach (var child in part.Features.Where(item => item.Parents.Contains(feature.Id)))
+        {
+            if (consumed.Add(child.Id))
+            {
+                node.Children.Add(BuildFeature(part, child, consumed));
+            }
+        }
+
+        return node;
+    }
+
+    private static void AddSketchEntities(ProjectNode sketchNode, Guid partId, Sketch sketch)
+    {
+        var lineIndex = 1;
+        foreach (var line in sketch.Lines.Where(line => line.SlotId is null))
+        {
+            sketchNode.Children.Add(new ProjectNode
+            {
+                Title = $"Line {lineIndex}",
+                Kind = ProjectNodeKind.Line,
+                OwnerId = partId,
+                ItemId = line.Id,
+                Icon = "line"
+            });
+            lineIndex++;
+        }
+
+        var circleIndex = 1;
+        foreach (var circle in sketch.Circles)
+        {
+            sketchNode.Children.Add(new ProjectNode
+            {
+                Title = $"Circle {circleIndex}",
+                Kind = ProjectNodeKind.Circle,
+                OwnerId = partId,
+                ItemId = circle.Id,
+                Icon = "circle"
+            });
+            circleIndex++;
+        }
+
+        var slotIndex = 1;
+        foreach (var slot in sketch.Slots)
+        {
+            sketchNode.Children.Add(new ProjectNode
+            {
+                Title = $"Slot {slotIndex}",
+                Kind = ProjectNodeKind.Slot,
+                OwnerId = partId,
+                ItemId = slot.Id,
+                Icon = "slot"
+            });
+            slotIndex++;
+        }
+
+        foreach (var constraint in sketch.Constraints)
+        {
+            sketchNode.Children.Add(new ProjectNode
+            {
+                Title = Describe(constraint),
+                Kind = ProjectNodeKind.Constraint,
+                OwnerId = partId,
+                ItemId = constraint.Id,
+                Icon = "constraint"
+            });
+        }
+    }
+
+    private static ProjectNodeKind KindOf(FeatureKind kind) => kind switch
+    {
+        FeatureKind.Pad => ProjectNodeKind.Pad,
+        FeatureKind.Hole => ProjectNodeKind.Hole,
+        FeatureKind.Gear => ProjectNodeKind.Gear,
+        _ => ProjectNodeKind.Sketch
+    };
+
+    private static string IconOf(FeatureKind kind) => kind switch
+    {
+        FeatureKind.Pad => "pad",
+        FeatureKind.Hole => "hole",
+        FeatureKind.Gear => "gear",
+        _ => "sketch"
+    };
 
     public static string Describe(SketchConstraint constraint)
     {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MotionMaker.Core;
 
 namespace MotionMaker.Core.Tests;
@@ -27,7 +28,7 @@ public class ProjectTests
 
         var restored = ProjectSerializer.FromJson(ProjectSerializer.ToJson(project));
 
-        Assert.Equal(1, restored.SchemaVersion);
+        Assert.Equal(2, restored.SchemaVersion);
         Assert.Equal("mm", restored.Units);
         Assert.Equal("Walker", restored.Name);
         Assert.Equal(2, restored.Assemblies.Count);
@@ -41,6 +42,73 @@ public class ProjectTests
         Assert.Equal(ConstraintKind.Horizontal, restoredSketch.Constraints.Single().Kind);
         Assert.Equal(4, restoredSketch.Points[1].X);
         Assert.False(restored.Parts.Single().Body.HasSolid);
+        Assert.Equal(ProjectSerializer.Magic, restored.Magic);
+    }
+
+    [Fact]
+    public void SaveFileStartsWithTheMagicId()
+    {
+        using var json = JsonDocument.Parse(ProjectSerializer.ToJson(new ProjectDocument()));
+        var first = json.RootElement.EnumerateObject().First();
+
+        Assert.Equal("magic", first.Name);
+        Assert.Equal(ProjectSerializer.Magic, first.Value.GetGuid());
+    }
+
+    [Fact]
+    public void SerializerRejectsAFileWithoutTheMagicId()
+    {
+        var json = """
+            {
+              "schemaVersion": 1,
+              "units": "mm",
+              "name": "Plain",
+              "assemblies": [],
+              "parts": []
+            }
+            """;
+
+        var error = Assert.Throws<InvalidDataException>(() => ProjectSerializer.FromJson(json));
+        Assert.Contains("Motion Maker", error.Message);
+    }
+
+    [Fact]
+    public void VersionOneProjectLoadsItsSketch()
+    {
+        var json = """
+            {
+              "magic": "813e785f-635b-42a2-a166-78cdcbbf4b3e",
+              "schemaVersion": 1,
+              "units": "mm",
+              "name": "Legacy",
+              "assemblies": [],
+              "parts": [
+                {
+                  "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                  "name": "Cam",
+                  "sketches": [
+                    {
+                      "id": "11111111-2222-3333-4444-555555555555",
+                      "name": "Sketch",
+                      "points": [ { "id": "99999999-8888-7777-6666-555555555555", "x": 3, "y": 4 } ],
+                      "lines": [],
+                      "circles": [],
+                      "constraints": []
+                    }
+                  ],
+                  "body": { "hasSolid": false }
+                }
+              ]
+            }
+            """;
+
+        var project = ProjectSerializer.FromJson(json);
+
+        Assert.Equal(2, project.SchemaVersion);
+        var part = project.Parts.Single();
+        Assert.Equal(3, part.Sketches.Single().Points.Single().X);
+        Assert.Equal(FeatureKind.Sketch, part.Features.Single().Kind);
+        Assert.False(part.Body.HasSolid);
     }
 
     [Fact]
@@ -48,6 +116,7 @@ public class ProjectTests
     {
         var json = """
             {
+              "magic": "813e785f-635b-42a2-a166-78cdcbbf4b3e",
               "schemaVersion": 9,
               "units": "mm",
               "name": "Future",

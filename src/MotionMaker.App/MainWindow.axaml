@@ -18,6 +18,8 @@
         <Separator/>
         <MenuItem Header="_Recent" x:Name="RecentMenu"/>
         <Separator/>
+        <MenuItem Header="Export _STL..." Click="OnExportStl"/>
+        <Separator/>
         <MenuItem Header="E_xit" Click="OnExit"/>
       </MenuItem>
       <MenuItem Header="_Edit">
@@ -48,33 +50,48 @@
       </MenuItem>
     </Menu>
 
-    <Border DockPanel.Dock="Top" Background="#2B2D31" Padding="6,4">
-      <StackPanel Orientation="Horizontal" Spacing="6">
-        <Button Content="New" Click="OnNew"/>
-        <Button Content="Open" Click="OnOpen"/>
-        <Button Content="Save" Click="OnSave"/>
-        <Button Content="Assembly" Click="OnAddAssembly"/>
-        <Button Content="Part" Click="OnAddPart"/>
-        <Separator Width="1" Height="22" Margin="4,0"/>
-        <Button Content="Top" Click="OnTop"/>
-        <Button Content="Front" Click="OnFront"/>
-        <Button Content="Right" Click="OnRight"/>
-        <Button Content="Iso" Click="OnIso"/>
-        <Button Content="Fit" Click="OnFrame"/>
-        <Separator Width="1" Height="22" Margin="4,0"/>
-        <StackPanel x:Name="SketchTools" Orientation="Horizontal" Spacing="6" IsVisible="False">
-          <Button x:Name="SelectTool" Content="Select" Click="OnSelectTool"/>
-          <Button x:Name="LineTool" Content="Line" Click="OnLineTool"/>
-          <Button x:Name="RectangleTool" Content="Rectangle" Click="OnRectangleTool"/>
-          <Button x:Name="CircleTool" Content="Circle" Click="OnCircleTool"/>
-          <Separator Width="1" Height="22" Margin="4,0"/>
-          <Button Content="H" Click="OnHorizontal" ToolTip.Tip="Horizontal"/>
-          <Button Content="V" Click="OnVertical" ToolTip.Tip="Vertical"/>
-          <Button Content="Coincident" Click="OnCoincident"/>
-          <Button Content="Length" Click="OnLength"/>
-          <Button Content="Radius" Click="OnRadius"/>
+    <Border DockPanel.Dock="Top" Background="#2B2D31">
+      <DockPanel LastChildFill="False">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="4,2,4,0">
+          <Button x:Name="HomeTab" Classes="ribbon-tab active" Content="Home" Click="OnHomeTab"/>
+          <Button x:Name="SketchTab" Classes="ribbon-tab" Content="Sketch" Click="OnSketchTab"/>
+          <Button x:Name="FeaturesTab" Classes="ribbon-tab" Content="Features" Click="OnFeaturesTab"/>
         </StackPanel>
-      </StackPanel>
+        <StackPanel x:Name="HomeRibbon" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="6,4">
+          <Button Classes="ribbon" Click="OnNew" ToolTip.Tip="New"><Path Classes="icon" Data="{StaticResource Icon.new}"/></Button>
+          <Button Classes="ribbon" Click="OnOpen" ToolTip.Tip="Open"><Path Classes="icon" Data="{StaticResource Icon.open}"/></Button>
+          <Button Classes="ribbon" Click="OnSave" ToolTip.Tip="Save"><Path Classes="icon" Data="{StaticResource Icon.save}"/></Button>
+          <Separator Width="1" Height="28" Margin="4,0"/>
+          <Button Classes="ribbon" Click="OnAddPart" ToolTip.Tip="Part"><Path Classes="icon" Data="{StaticResource Icon.part}"/></Button>
+          <Separator Width="1" Height="28" Margin="4,0"/>
+          <Button Classes="ribbon" Click="OnTop" ToolTip.Tip="Top"><Path Classes="icon" Data="{StaticResource Icon.top}"/></Button>
+          <Button Classes="ribbon" Click="OnFront" ToolTip.Tip="Front"><Path Classes="icon" Data="{StaticResource Icon.front}"/></Button>
+          <Button Classes="ribbon" Click="OnRight" ToolTip.Tip="Right"><Path Classes="icon" Data="{StaticResource Icon.right}"/></Button>
+          <Button Classes="ribbon" Click="OnIso" ToolTip.Tip="Iso"><Path Classes="icon" Data="{StaticResource Icon.iso}"/></Button>
+          <Button Classes="ribbon" Click="OnFrame" ToolTip.Tip="Fit"><Path Classes="icon" Data="{StaticResource Icon.fit}"/></Button>
+        </StackPanel>
+        <StackPanel x:Name="SketchRibbon" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="6,4" IsVisible="False">
+          <Button x:Name="SelectTool" Classes="ribbon" Click="OnSelectTool" ToolTip.Tip="Select"><Path Classes="icon" Data="{StaticResource Icon.select}"/></Button>
+          <Button x:Name="LineTool" Classes="ribbon" Click="OnLineTool" ToolTip.Tip="Line"><Path Classes="icon" Data="{StaticResource Icon.line}"/></Button>
+          <Button x:Name="RectangleTool" Classes="ribbon" Click="OnRectangleTool" ToolTip.Tip="Rectangle"><Path Classes="icon" Data="{StaticResource Icon.rectangle}"/></Button>
+          <Button x:Name="CircleTool" Classes="ribbon" Click="OnCircleTool" ToolTip.Tip="Circle"><Path Classes="icon" Data="{StaticResource Icon.circle}"/></Button>
+          <Button x:Name="SlotTool" Classes="ribbon" Click="OnSlotTool" ToolTip.Tip="Slot"><Path Classes="icon" Data="{StaticResource Icon.slot}"/></Button>
+          <Separator Width="1" Height="28" Margin="4,0"/>
+          <Button x:Name="HorizontalTool" Classes="ribbon" Click="OnHorizontal" ToolTip.Tip="Horizontal"><Path Classes="icon" Data="{StaticResource Icon.horizontal}"/></Button>
+          <Button x:Name="VerticalTool" Classes="ribbon" Click="OnVertical" ToolTip.Tip="Vertical"><Path Classes="icon" Data="{StaticResource Icon.vertical}"/></Button>
+          <Button x:Name="CoincidentTool" Classes="ribbon" Click="OnCoincident" ToolTip.Tip="Coincident"><Path Classes="icon" Data="{StaticResource Icon.coincident}"/></Button>
+          <Button x:Name="LengthTool" Classes="ribbon" Click="OnLength" ToolTip.Tip="Length"><Path Classes="icon" Data="{StaticResource Icon.length}"/></Button>
+          <Button x:Name="RadiusTool" Classes="ribbon" Click="OnRadius" ToolTip.Tip="Radius"><Path Classes="icon" Data="{StaticResource Icon.radius}"/></Button>
+        </StackPanel>
+        <StackPanel x:Name="FeaturesRibbon" DockPanel.Dock="Top" Orientation="Horizontal" Spacing="2" Margin="6,4" IsVisible="False">
+          <Button x:Name="PadButton" Classes="ribbon" Click="OnPad" ToolTip.Tip="Pad"><Path Classes="icon" Data="{StaticResource Icon.pad}"/></Button>
+          <Button x:Name="HoleButton" Classes="ribbon" Click="OnHole" ToolTip.Tip="Hole"><Path Classes="icon" Data="{StaticResource Icon.hole}"/></Button>
+          <Button x:Name="NewSketchButton" Classes="ribbon" Click="OnNewSketch" ToolTip.Tip="New sketch"><Path Classes="icon" Data="{StaticResource Icon.sketch}"/></Button>
+          <Separator Width="1" Height="28" Margin="4,0"/>
+          <Button x:Name="GearButton" Classes="ribbon" Click="OnGear" ToolTip.Tip="Gear"><Path Classes="icon" Data="{StaticResource Icon.gear}"/></Button>
+          <Button x:Name="GearWizardButton" Classes="ribbon" Click="OnGearWizard" ToolTip.Tip="Gear wizard"><Path Classes="icon" Data="{StaticResource Icon.wizard}"/></Button>
+        </StackPanel>
+      </DockPanel>
     </Border>
 
     <Border DockPanel.Dock="Bottom" Background="#1E2024" Padding="10,4">
@@ -102,6 +119,7 @@
             <TextBlock Text="Depth (mm)"/>
             <NumericUpDown x:Name="PlateDepth" Minimum="10" Maximum="5000" Increment="10" FormatString="0.##" ValueChanged="OnPlateEdited"/>
           </StackPanel>
+          <StackPanel x:Name="FeatureProperties" Spacing="6"/>
           <TextBlock x:Name="PropertyNote" TextWrapping="Wrap"/>
         </StackPanel>
       </ScrollViewer>

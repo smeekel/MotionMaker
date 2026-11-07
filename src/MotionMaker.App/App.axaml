@@ -2,7 +2,43 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MotionMaker.App.App"
              RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://MotionMaker.App/Icons.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <Style Selector="Button.ribbon">
+      <Setter Property="Width" Value="36"/>
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="Padding" Value="6"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.ribbon.active">
+      <Setter Property="Background" Value="#3D4C63"/>
+    </Style>
+    <Style Selector="Button.ribbon-tab">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="12,4"/>
+      <Setter Property="MinWidth" Value="72"/>
+    </Style>
+    <Style Selector="Button.ribbon-tab.active">
+      <Setter Property="Background" Value="#343841"/>
+    </Style>
+    <Style Selector="Path.icon">
+      <Setter Property="Width" Value="20"/>
+      <Setter Property="Height" Value="20"/>
+      <Setter Property="Stretch" Value="Uniform"/>
+      <Setter Property="Stroke" Value="White"/>
+      <Setter Property="StrokeThickness" Value="1.4"/>
+      <Setter Property="StrokeJoin" Value="Round"/>
+      <Setter Property="StrokeLineCap" Value="Round"/>
+      <Setter Property="Fill" Value="Transparent"/>
+    </Style>
   </Application.Styles>
 </Application>

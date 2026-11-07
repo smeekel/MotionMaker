@@ -70,16 +70,20 @@ public static class ProjectEdits
             Id = Guid.NewGuid(),
             Name = NextName(document.Parts.Select(item => item.Name), "Part"),
             Camera = CameraState.CreatePartView(),
-            Sketches =
-            [
-                new Sketch
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "Sketch"
-                }
-            ],
             Body = new PartBody()
         };
+        var sketch = new Sketch
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sketch"
+        };
+        part.Sketches.Add(sketch);
+        part.Features.Add(new PartFeature
+        {
+            Name = "Sketch",
+            Kind = FeatureKind.Sketch,
+            SketchId = sketch.Id
+        });
         document.Parts.Add(part);
         return part;
     }

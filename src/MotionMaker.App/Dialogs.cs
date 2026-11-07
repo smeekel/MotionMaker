@@ -1,7 +1,10 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using MotionMaker.Core;
 
 namespace MotionMaker.App;
+
+internal sealed record GearRequest(GearKind Kind, double Module, int Teeth, double Pressure, double FaceWidth, double Bore, double Pitch);
 
 internal enum SaveChoice
 {
@@ -60,6 +63,75 @@ internal static class Dialogs
         close.Click += (_, _) => dialog.Close();
         dialog.Content = Layout(message, close);
         await dialog.ShowDialog(owner);
+    }
+
+    public static async Task<GearRequest?> AskGearAsync(Window owner)
+    {
+        GearRequest? request = null;
+        var dialog = Create("Gear", 420, 460);
+        var spur = new RadioButton { Content = "Spur", IsChecked = true, Margin = new Avalonia.Thickness(16, 12, 16, 0) };
+        var bevel = new RadioButton { Content = "Bevel", Margin = new Avalonia.Thickness(16, 4, 16, 0) };
+        var module = NumberBox("Module (mm)", 1);
+        var teeth = NumberBox("Teeth", 20);
+        var pressure = NumberBox("Pressure angle (°)", 20);
+        var face = NumberBox("Face width (mm)", 10);
+        var bore = NumberBox("Bore (mm)", 6);
+        var pitch = NumberBox("Pitch angle (°)", 45);
+        pitch.Label.IsVisible = false;
+        pitch.Box.IsVisible = false;
+        bevel.IsCheckedChanged += (_, _) =>
+        {
+            var show = bevel.IsChecked == true;
+            pitch.Label.IsVisible = show;
+            pitch.Box.IsVisible = show;
+        };
+        var create = new Button { Content = "Create", IsDefault = true, MinWidth = 88 };
+        var defaults = new Button { Content = "Use defaults", MinWidth = 110 };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 88 };
+        GearRequest BuildRequest(bool useDefaults)
+        {
+            var kind = bevel.IsChecked == true ? GearKind.Bevel : GearKind.Spur;
+            if (useDefaults)
+            {
+                return new GearRequest(kind, 1, 20, 20, 10, 6, 45);
+            }
+
+            return new GearRequest(
+                kind,
+                Read(module.Box, 1),
+                Math.Max(6, (int)Math.Round(Read(teeth.Box, 20))),
+                Read(pressure.Box, 20),
+                Read(face.Box, 10),
+                Read(bore.Box, 6),
+                kind == GearKind.Bevel ? Read(pitch.Box, 45) : 45);
+        }
+
+        create.Click += (_, _) => { request = BuildRequest(false); dialog.Close(); };
+        defaults.Click += (_, _) => { request = BuildRequest(true); dialog.Close(); };
+        cancel.Click += (_, _) => dialog.Close();
+        var stack = new StackPanel();
+        stack.Children.Add(spur);
+        stack.Children.Add(bevel);
+        stack.Children.Add(module.Label);
+        stack.Children.Add(module.Box);
+        stack.Children.Add(teeth.Label);
+        stack.Children.Add(teeth.Box);
+        stack.Children.Add(pressure.Label);
+        stack.Children.Add(pressure.Box);
+        stack.Children.Add(face.Label);
+        stack.Children.Add(face.Box);
+        stack.Children.Add(bore.Label);
+        stack.Children.Add(bore.Box);
+        stack.Children.Add(pitch.Label);
+        stack.Children.Add(pitch.Box);
+        var panel = new DockPanel();
+        var buttons = Buttons(create, defaults, cancel);
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        panel.Children.Add(buttons);
+        panel.Children.Add(stack);
+        dialog.Content = panel;
+        await dialog.ShowDialog(owner);
+        return request;
     }
 
     public static async Task<bool> EditPreferencesAsync(Window owner, MotionMaker.Core.UserSettings settings)

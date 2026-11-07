@@ -9,6 +9,7 @@ internal sealed class GlRenderer : IDisposable
 {
     private GL? _gl;
     private uint _colorProgram;
+    private uint _meshProgram;
     private uint _textureProgram;
     private uint _vao;
     private uint _vbo;
@@ -21,6 +22,7 @@ internal sealed class GlRenderer : IDisposable
     {
         _gl = GL.GetApi(name => glInterface.GetProcAddress(name));
         _colorProgram = CreateProgram(ColorVertex, ColorFragment);
+        _meshProgram = CreateProgram(MeshVertex, MeshFragment);
         _textureProgram = CreateProgram(TextureVertex, TextureFragment);
         _vao = _gl.GenVertexArray();
         _vbo = _gl.GenBuffer();
@@ -39,11 +41,12 @@ internal sealed class GlRenderer : IDisposable
         var gl = _gl ?? throw new InvalidOperationException("OpenGL is not initialized.");
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)framebuffer);
         gl.Viewport(0, 0, (uint)Math.Max(pixelWidth, 1), (uint)Math.Max(pixelHeight, 1));
-        gl.Disable(EnableCap.DepthTest);
+        gl.Enable(EnableCap.DepthTest);
+        gl.DepthFunc(DepthFunction.Lequal);
         gl.Enable(EnableCap.Blend);
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
         gl.ClearColor(0.15f, 0.16f, 0.18f, 1f);
-        gl.Clear(ClearBufferMask.ColorBufferBit);
+        gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
         if (!scene.HasContent || scene.Camera is null)
         {
@@ -53,8 +56,12 @@ internal sealed class GlRenderer : IDisposable
         var camera = scene.Camera;
         var width = Math.Max(dipWidth, 1);
         var height = Math.Max(dipHeight, 1);
+        gl.Disable(EnableCap.DepthTest);
         DrawPlate(gl, camera, width, height, scene);
         DrawSketchGrid(gl, camera, width, height, scene);
+        gl.Enable(EnableCap.DepthTest);
+        DrawSolid(gl, camera, width, height, scene);
+        gl.Disable(EnableCap.DepthTest);
         DrawSegments(gl, camera, width, height, scene);
         DrawCircles(gl, camera, width, height, scene.Circles);
         if (scene.PreviewCircle is SceneCircle preview)
@@ -83,6 +90,11 @@ internal sealed class GlRenderer : IDisposable
         if (_colorProgram != 0)
         {
             gl.DeleteProgram(_colorProgram);
+        }
+
+        if (_meshProgram != 0)
+        {
+            gl.DeleteProgram(_meshProgram);
         }
 
         if (_textureProgram != 0)
@@ -180,9 +192,125 @@ internal sealed class GlRenderer : IDisposable
         DrawGridLines(gl, camera, width, height, lines);
     }
 
+    private void DrawSolid(GL gl, CameraState camera, double width, double height, SceneSnapshot scene)
+    {
+        if (scene.SolidPositions.Length < 9 || scene.SolidIndices.Length < 3)
+        {
+            return;
+        }
+
+        var vertices = new List<float>(scene.SolidIndices.Length * 6);
+        var light = Vector3.Normalize(new Vector3(0.35f, 0.55f, 0.76f));
+        for (var index = 0; index + 2 < scene.SolidIndices.Length; index += 3)
+        {
+            if (!TryProjected(camera, width, height, scene.SolidPositions, scene.SolidIndices[index], out var a, out var aw)
+                || !TryProjected(camera, width, height, scene.SolidPositions, scene.SolidIndices[index + 1], out var b, out var bw)
+                || !TryProjected(camera, width, height, scene.SolidPositions, scene.SolidIndices[index + 2], out var c, out var cw))
+            {
+                continue;
+            }
+
+            var normal = Vector3.Normalize(Vector3.Cross(bw - aw, cw - aw));
+            if (float.IsNaN(normal.X))
+            {
+                normal = new Vector3(0, 0, 1);
+            }
+
+            var shade = Math.Clamp(0.32f + 0.68f * Math.Max(0, Vector3.Dot(normal, light)), 0, 1);
+            var face = index / 3 < scene.SolidFaces.Length ? scene.SolidFaces[index / 3] : "";
+            var highlighted = face.Length > 0 && face == scene.HighlightFaceId;
+            var tint = scene.SolidFrozen
+                ? new Vector3(0.72f, 0.28f, 0.32f)
+                : highlighted ? new Vector3(0.86f, 0.62f, 0.28f) : new Vector3(0.58f, 0.66f, 0.74f);
+            var color = tint * shade;
+            AddMeshVertex(vertices, a, color);
+            AddMeshVertex(vertices, b, color);
+            AddMeshVertex(vertices, c, color);
+        }
+
+        if (vertices.Count < 18)
+        {
+            return;
+        }
+
+        gl.UseProgram(_meshProgram);
+        gl.BindVertexArray(_vao);
+        gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+        gl.BufferData(BufferTargetARB.ArrayBuffer, vertices.ToArray(), BufferUsageARB.DynamicDraw);
+        gl.EnableVertexAttribArray(0);
+        gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+        gl.EnableVertexAttribArray(1);
+        gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+        gl.DrawArrays(PrimitiveType.Triangles, 0, (uint)(vertices.Count / 6));
+        gl.DisableVertexAttribArray(1);
+
+        if (!scene.SolidFrozen)
+        {
+            return;
+        }
+
+        gl.Disable(EnableCap.DepthTest);
+
+        var edges = new List<float>();
+        for (var index = 0; index + 2 < scene.SolidIndices.Length; index += 3)
+        {
+            AddEdge(edges, camera, width, height, scene.SolidPositions, scene.SolidIndices[index], scene.SolidIndices[index + 1]);
+            AddEdge(edges, camera, width, height, scene.SolidPositions, scene.SolidIndices[index + 1], scene.SolidIndices[index + 2]);
+            AddEdge(edges, camera, width, height, scene.SolidPositions, scene.SolidIndices[index + 2], scene.SolidIndices[index]);
+        }
+
+        DrawNdc(gl, edges, PrimitiveType.Lines, new Vector4(0.95f, 0.35f, 0.38f, 1));
+    }
+
+    private static void AddMeshVertex(List<float> vertices, Vector3 position, Vector3 color)
+    {
+        vertices.Add(position.X);
+        vertices.Add(position.Y);
+        vertices.Add(position.Z);
+        vertices.Add(color.X);
+        vertices.Add(color.Y);
+        vertices.Add(color.Z);
+    }
+
+    private static bool TryProjected(
+        CameraState camera,
+        double width,
+        double height,
+        double[] positions,
+        int index,
+        out Vector3 ndc,
+        out Vector3 world)
+    {
+        world = new Vector3(
+            (float)positions[index * 3],
+            (float)positions[index * 3 + 1],
+            (float)positions[index * 3 + 2]);
+        if (!CameraMath.TryProject(camera, width, height, new Vec3(world.X, world.Y, world.Z), out var projected))
+        {
+            ndc = default;
+            return false;
+        }
+
+        var depth = (float)Math.Clamp(projected.Depth / Math.Max(camera.Distance * 8, 1), 0, 1);
+        ndc = new Vector3((float)projected.NdcX, (float)projected.NdcY, -1f + 2f * depth);
+        return true;
+    }
+
+    private static void AddEdge(List<float> vertices, CameraState camera, double width, double height, double[] positions, int a, int b)
+    {
+        if (TryProjected(camera, width, height, positions, a, out var pa, out _)
+            && TryProjected(camera, width, height, positions, b, out var pb, out _))
+        {
+            vertices.Add(pa.X);
+            vertices.Add(pa.Y);
+            vertices.Add(pb.X);
+            vertices.Add(pb.Y);
+        }
+    }
+
     private void DrawSegments(GL gl, CameraState camera, double width, double height, SceneSnapshot scene)
     {
-        foreach (var color in new[] { SceneColor.Sketch, SceneColor.Preview, SceneColor.Selected })
+        foreach (var color in new[] { SceneColor.Sketch, SceneColor.Preview, SceneColor.Selected, SceneColor.Error })
         {
             var vertices = new List<float>();
             foreach (var segment in scene.Segments)
@@ -192,7 +320,7 @@ internal sealed class GlRenderer : IDisposable
                     continue;
                 }
 
-                AddProjected(vertices, camera, width, height, segment.X1, segment.Y1, 0.05, segment.X2, segment.Y2, 0.05);
+                AddProjected(vertices, camera, width, height, segment.X1, segment.Y1, segment.Z1, segment.X2, segment.Y2, segment.Z2);
             }
 
             DrawNdc(gl, vertices, PrimitiveType.Lines, ColorOf(color));
@@ -201,7 +329,7 @@ internal sealed class GlRenderer : IDisposable
 
     private void DrawCircles(GL gl, CameraState camera, double width, double height, IReadOnlyList<SceneCircle> circles)
     {
-        foreach (var color in new[] { SceneColor.Sketch, SceneColor.Preview, SceneColor.Selected })
+        foreach (var color in new[] { SceneColor.Sketch, SceneColor.Preview, SceneColor.Selected, SceneColor.Error })
         {
             var vertices = new List<float>();
             foreach (var circle in circles)
@@ -247,8 +375,31 @@ internal sealed class GlRenderer : IDisposable
                     continue;
                 }
 
-                AddProjected(vertices, camera, width, height, point.X - half, point.Y, 0.08, point.X + half, point.Y, 0.08);
-                AddProjected(vertices, camera, width, height, point.X, point.Y - half, 0.08, point.X, point.Y + half, 0.08);
+                var basis = CameraMath.Basis(camera);
+                var right = basis.Right * half;
+                var up = basis.Up * half;
+                AddProjected(
+                    vertices,
+                    camera,
+                    width,
+                    height,
+                    point.X - right.X,
+                    point.Y - right.Y,
+                    point.Z - right.Z,
+                    point.X + right.X,
+                    point.Y + right.Y,
+                    point.Z + right.Z);
+                AddProjected(
+                    vertices,
+                    camera,
+                    width,
+                    height,
+                    point.X - up.X,
+                    point.Y - up.Y,
+                    point.Z - up.Z,
+                    point.X + up.X,
+                    point.Y + up.Y,
+                    point.Z + up.Z);
             }
 
             DrawNdc(gl, vertices, PrimitiveType.Lines, selected ? new Vector4(1f, 0.62f, 0.15f, 1f) : new Vector4(0.95f, 0.97f, 1f, 1f));
@@ -653,12 +804,31 @@ internal sealed class GlRenderer : IDisposable
     {
         SceneColor.Selected => new Vector4(1f, 0.62f, 0.15f, 1f),
         SceneColor.Preview => new Vector4(1f, 0.84f, 0.28f, 1f),
+        SceneColor.Error => new Vector4(0.95f, 0.35f, 0.38f, 1f),
         _ => new Vector4(0.90f, 0.95f, 1f, 1f)
     };
 
     private readonly record struct GridLine(double X1, double Y1, double X2, double Y2, bool Major);
 
     private readonly record struct LabelTexture(uint Texture, int Width, int Height);
+
+    private const string MeshVertex = """
+        #version 330 core
+        layout(location = 0) in vec3 aPos;
+        layout(location = 1) in vec3 aColor;
+        out vec3 vColor;
+        void main() {
+            gl_Position = vec4(aPos, 1.0);
+            vColor = aColor;
+        }
+        """;
+
+    private const string MeshFragment = """
+        #version 330 core
+        in vec3 vColor;
+        out vec4 FragColor;
+        void main() { FragColor = vec4(vColor, 1.0); }
+        """;
 
     private const string ColorVertex = """
         #version 330 core
@@ -717,6 +887,16 @@ internal sealed class SceneSnapshot
 
     public SceneCircle? PreviewCircle { get; init; }
 
+    public double[] SolidPositions { get; init; } = [];
+
+    public int[] SolidIndices { get; init; } = [];
+
+    public string[] SolidFaces { get; init; } = [];
+
+    public bool SolidFrozen { get; init; }
+
+    public string? HighlightFaceId { get; init; }
+
     public static SceneSnapshot From(ViewportScene? scene)
     {
         if (scene is null)
@@ -748,7 +928,12 @@ internal sealed class SceneSnapshot
             Segments = scene.Segments.ToArray(),
             Circles = scene.Circles.ToArray(),
             Points = scene.Points.ToArray(),
-            PreviewCircle = scene.PreviewCircle
+            PreviewCircle = scene.PreviewCircle,
+            SolidPositions = scene.Solid?.Positions.ToArray() ?? [],
+            SolidIndices = scene.Solid?.Indices.ToArray() ?? [],
+            SolidFaces = scene.Solid?.TriangleFaces.ToArray() ?? [],
+            SolidFrozen = scene.SolidFrozen,
+            HighlightFaceId = scene.HighlightFaceId
         };
     }
 }

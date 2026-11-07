@@ -15,8 +15,13 @@ public sealed class SceneView : OpenGlControlBase
     private bool _orbiting;
     private bool _panning;
     private bool _sketching;
-    private double _lastWorldX;
-    private double _lastWorldY;
+    private bool _pendingPick;
+    private bool _shift;
+    private double _lastU;
+    private double _lastV;
+    private Vec3 _lastWorld;
+    private Vec3 _rayOrigin;
+    private Vec3 _rayDirection;
     private bool _lastHit;
     private SceneSnapshot _snapshot = new();
 
@@ -28,6 +33,8 @@ public sealed class SceneView : OpenGlControlBase
     public ViewportScene? Scene { get; set; }
 
     public bool LeftButtonOrbits { get; set; } = true;
+
+    public bool PickOrOrbit { get; set; }
 
     public bool InvertWheel { get; set; }
 
@@ -43,7 +50,9 @@ public sealed class SceneView : OpenGlControlBase
 
     public event Action? ViewChanged;
 
-    public event Action<double, double, bool>? CursorMoved;
+    public event Action<double, double, double, bool>? CursorMoved;
+
+    public event Action<SketchPointer>? FaceClicked;
 
     public event Action<SketchPointer>? SketchGesture;
 
@@ -132,7 +141,16 @@ public sealed class SceneView : OpenGlControlBase
             return;
         }
 
+        _shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var forceOrbit = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        if (PickOrOrbit && !forceOrbit)
+        {
+            _pendingPick = true;
+            _last = point;
+            e.Handled = true;
+            return;
+        }
+
         if (LeftButtonOrbits || forceOrbit)
         {
             _orbiting = true;
@@ -150,6 +168,13 @@ public sealed class SceneView : OpenGlControlBase
 
     public void MovePointer(PointerEventArgs e, Point point)
     {
+        _shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (_pendingPick && Math.Abs(point.X - _last.X) + Math.Abs(point.Y - _last.Y) > 5)
+        {
+            _pendingPick = false;
+            _orbiting = true;
+        }
+
         if (Scene?.Camera is CameraState camera && (_orbiting || _panning))
         {
             var dx = point.X - _last.X;
@@ -183,9 +208,16 @@ public sealed class SceneView : OpenGlControlBase
 
     public void EndPointer(Point? point)
     {
-        var wasActive = _orbiting || _panning || _sketching;
+        var wasActive = _orbiting || _panning || _sketching || _pendingPick;
+        var pick = _pendingPick;
+        _pendingPick = false;
         EndCameraDrag();
         UpdateCursor(point ?? _last);
+        if (pick)
+        {
+            FaceClicked?.Invoke(MakePointer(SketchPointerPhase.Released));
+        }
+
         FinishSketch();
         if (wasActive)
         {
@@ -241,12 +273,23 @@ public sealed class SceneView : OpenGlControlBase
         if (Scene?.Camera is not CameraState camera || Bounds.Width <= 1 || Bounds.Height <= 1)
         {
             _lastHit = false;
-            CursorMoved?.Invoke(0, 0, false);
+            CursorMoved?.Invoke(0, 0, 0, false);
             return;
         }
 
-        _lastHit = CameraMath.TryHitPlane(camera, Bounds.Width, Bounds.Height, point.X, point.Y, 0, out _lastWorldX, out _lastWorldY);
-        CursorMoved?.Invoke(_lastWorldX, _lastWorldY, _lastHit);
+        var plane = Scene.WorkPlane ?? new SketchPlane();
+        CameraMath.TryRay(camera, Bounds.Width, Bounds.Height, point.X, point.Y, out _rayOrigin, out _rayDirection);
+        _lastHit = CameraMath.TryHitSketchPlane(
+            camera,
+            Bounds.Width,
+            Bounds.Height,
+            point.X,
+            point.Y,
+            plane,
+            out _lastU,
+            out _lastV,
+            out _lastWorld);
+        CursorMoved?.Invoke(_lastWorld.X, _lastWorld.Y, _lastWorld.Z, _lastHit);
     }
 
     private void RaiseSketch(SketchPointerPhase phase)
@@ -257,6 +300,30 @@ public sealed class SceneView : OpenGlControlBase
             tolerance = CameraMath.VisibleHalfHeight(camera) / Bounds.Height * 10;
         }
 
-        SketchGesture?.Invoke(new SketchPointer(phase, _lastWorldX, _lastWorldY, _lastHit, tolerance));
+        SketchGesture?.Invoke(MakePointer(phase));
+    }
+
+    private SketchPointer MakePointer(SketchPointerPhase phase)
+    {
+        var tolerance = 1d;
+        if (Scene?.Camera is CameraState camera && Bounds.Height > 1)
+        {
+            tolerance = CameraMath.VisibleHalfHeight(camera) / Bounds.Height * 10;
+        }
+
+        return new SketchPointer(
+            phase,
+            _lastU,
+            _lastV,
+            _lastHit,
+            tolerance,
+            _last.X,
+            _last.Y,
+            _shift,
+            Math.Max(Bounds.Width, 1),
+            Math.Max(Bounds.Height, 1),
+            _rayOrigin,
+            _rayDirection,
+            _lastWorld.Z);
     }
 }
